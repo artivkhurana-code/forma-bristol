@@ -606,6 +606,7 @@ a.app:hover::after{ opacity:1; transform:translate(1px,-1px); color:var(--ink); 
 .app__txt{ display:flex; flex-direction:column; gap:2px; min-width:0; }
 .app__name{ font-family:var(--serif); font-weight:560; font-size:1.05rem; color:var(--tx-dark); letter-spacing:-.01em; }
 .app__desc{ color:var(--tx-dark-soft); font-size:.85rem; line-height:1.34; }
+.app__phone{ font-style:italic; font-size:.78rem; color:var(--tx-dark-soft); white-space:nowrap; margin-top:3px; }
 
 /* ============================================================
    FAQ
