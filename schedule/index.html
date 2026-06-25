@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>The Forma Map of Bristol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  /* ============================================================
+     THE FORMA MAP OF BRISTOL
+     Design: Are.na brutalism × forma.city/bristol-schedule
+     White paper · Times body · hairline boxes · mono labels
+     Single accent: Forma yellow #fef102
+     ============================================================ */
+  :root{
+    --paper:#ffffff;
+    --ink:#000000;
+    --gray:#696969;        /* are.na link gray */
+    --line:#dedede;        /* are.na hairline */
+    --line2:#000000;       /* strong brutalist line */
+    --fill:#f7f7f7;        /* are.na pill fill */
+    --yellow:#fef102;       /* forma accent */
+    --serif:"Times New Roman", Times, serif;
+    --sans:Arial, Helvetica, sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, monospace;
+    --rad:3px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:var(--serif);font-size:16px;line-height:1.35;
+    overflow:hidden;-webkit-font-smoothing:antialiased;
+  }
+
+  /* ---- outer frame ---- */
+  .frame{
+    position:fixed;inset:0;display:flex;flex-direction:column;
+    padding:18px;gap:14px;
+  }
+
+  /* ---- top bar (are.na minimal header) ---- */
+  .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex:0 0 auto;}
+  .ident{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .mark{font-family:var(--sans);font-weight:700;font-size:15px;letter-spacing:2px;color:var(--ink);line-height:1;}
+  .title{font-family:var(--sans);font-weight:700;font-size:clamp(20px,3.1vw,34px);letter-spacing:-.5px;
+    line-height:.98;color:var(--ink);margin:0;text-wrap:balance;}
+  .subtitle{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-top:2px;}
+
+  .topright{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:0 0 auto;}
+  .meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);text-align:right;line-height:1.5;}
+  .meta b{color:var(--ink);font-weight:600;}
+
+  /* ---- date pill row (bristol-schedule) ---- */
+  .dates{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto;}
+  .datepill{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink);background:var(--paper);border:1px solid var(--line2);border-radius:30px;
+    padding:6px 12px;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;}
+  .datepill:hover{background:var(--fill);}
+  .datepill.active{background:var(--yellow);border-color:var(--ink);color:var(--ink);font-weight:700;}
+
+  /* ---- main split: map + schedule ---- */
+  .body{flex:1 1 auto;min-height:0;display:flex;gap:14px;}
+  .mapcol{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;}
+  .mapbox{flex:1 1 auto;min-height:0;position:relative;border:1px solid var(--line2);border-radius:var(--rad);overflow:hidden;background:#eee;}
+  #map{position:absolute;inset:0;background:#e9e9e6;}
+
+  .maplabel{position:absolute;top:0;left:0;z-index:540;
+    font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);
+    background:var(--paper);border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);
+    border-bottom-right-radius:var(--rad);padding:6px 10px;}
+  .mapcredit{position:absolute;bottom:0;right:0;z-index:540;
+    font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);
+    background:var(--paper);border-left:1px solid var(--line2);border-top:1px solid var(--line2);
+    border-top-left-radius:var(--rad);padding:4px 8px;}
+
+  /* ---- markers ---- */
+  .pin{display:flex;align-items:center;justify-content:center;
+    width:24px;height:24px;border-radius:50%;background:var(--paper);border:1.5px solid var(--ink);
+    font-family:var(--mono);font-weight:700;font-size:11px;color:var(--ink);cursor:pointer;
+    box-shadow:0 1px 0 rgba(0,0,0,.25);transition:background .12s;}
+  .pin:hover{background:var(--yellow);}
+  .pin.sel{background:var(--yellow);}
+  .hqwrap{position:relative;display:flex;align-items:center;}
+  .hqdot{width:30px;height:30px;border-radius:50%;background:var(--yellow);border:2px solid var(--ink);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:11px;color:var(--ink);
+    box-shadow:0 0 0 6px rgba(254,241,2,.32);}
+  .hqlabel{position:absolute;left:36px;top:50%;transform:translateY(-50%);white-space:nowrap;
+    font-family:var(--sans);font-weight:700;font-size:12px;letter-spacing:-.2px;color:var(--ink);
+    background:var(--yellow);border:1px solid var(--ink);border-radius:var(--rad);padding:3px 8px;}
+  .hqpulse{position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;border:2px solid var(--yellow);
+    animation:pulse 1.8s ease-out infinite;}
+  @keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+
+  /* leaflet popup → are.na card */
+  .leaflet-popup-content-wrapper{border-radius:var(--rad)!important;border:1px solid var(--line2)!important;
+    box-shadow:4px 4px 0 rgba(0,0,0,.08)!important;background:var(--paper)!important;}
+  .leaflet-popup-content{margin:0!important;width:248px!important;}
+  .leaflet-popup-tip{border:1px solid var(--line2)!important;background:var(--paper)!important;}
+  .leaflet-popup-close-button{color:var(--ink)!important;font-size:18px!important;padding:7px 9px 0 0!important;
+    width:24px!important;height:24px!important;}
+  .pop{font-family:var(--serif);}
+  .pop .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    border-bottom:1px solid var(--line);padding:10px 30px 10px 12px;}
+  .pop .pday{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--ink);}
+  .pop .ptime{font-family:var(--mono);font-size:11px;color:var(--gray);}
+  .pop .pbody{padding:11px 12px 12px;}
+  .pop .ptitle{font-family:var(--sans);font-weight:700;font-size:15px;line-height:1.12;margin:0 0 3px;color:var(--ink);}
+  .pop .pvenue{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--ink);background:var(--yellow);display:inline-block;padding:1px 5px;margin-bottom:7px;}
+  .pop .pdesc{font-size:13px;line-height:1.4;color:#222;margin:0;}
+  .pop .plineup{margin:8px 0 0;padding:8px 0 0;border-top:1px solid var(--line);list-style:none;}
+  .pop .plineup li{font-family:var(--mono);font-size:11px;color:#333;line-height:1.55;}
+  .pop .pmaps{display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--ink);border:1px solid var(--ink);border-radius:30px;padding:4px 10px;text-decoration:none;}
+  .pop .pmaps:hover{background:var(--yellow);}
+
+  .leaflet-control-zoom{border:1px solid var(--line2)!important;border-radius:var(--rad)!important;
+    margin:12px!important;overflow:hidden;}
+  .leaflet-control-zoom a{background:var(--paper)!important;color:var(--ink)!important;
+    border:none!important;border-bottom:1px solid var(--line2)!important;font-family:var(--mono)!important;font-weight:700!important;}
+  .leaflet-control-zoom a:last-child{border-bottom:none!important;}
+  .leaflet-control-zoom a:hover{background:var(--yellow)!important;}
+  .leaflet-control-attribution{display:none!important;}
+
+  /* ---- schedule column (are.na bordered list) ---- */
+  .schedcol{flex:0 0 340px;display:flex;flex-direction:column;min-height:0;
+    border:1px solid var(--line2);border-radius:var(--rad);background:var(--paper);overflow:hidden;}
+  .schedhead{flex:0 0 auto;display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+    padding:10px 14px;border-bottom:1px solid var(--line2);}
+  .schedhead h2{font-family:var(--sans);font-weight:700;font-size:16px;letter-spacing:-.3px;margin:0;text-transform:none;}
+  .schedhead .count{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);}
+  .schedlist{flex:1 1 auto;min-height:0;overflow-y:auto;}
+  .card{padding:13px 14px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .1s;}
+  .card:last-child{border-bottom:none;}
+  .card:hover{background:var(--fill);}
+  .card.sel{background:#fffbcc;}
+  .card .crow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px;}
+  .card .cdate{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--ink);}
+  .card .ctime{font-family:var(--mono);font-size:11px;color:var(--gray);}
+  .card .cnum{font-family:var(--mono);font-size:10px;color:var(--gray);}
+  .card .ctitle{font-family:var(--sans);font-weight:700;font-size:14.5px;line-height:1.12;margin:0 0 4px;color:var(--ink);}
+  .card .cvenue{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+    color:var(--ink);display:inline;background:linear-gradient(transparent 55%, var(--yellow) 55%);padding:0 1px;}
+  .card.hqcard{background:#fffbe0;}
+  .card.hqcard:hover{background:#fff6c2;}
+  .card .hqtag{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink);background:var(--yellow);border:1px solid var(--ink);border-radius:30px;
+    padding:1px 7px;margin-left:6px;vertical-align:middle;}
+
+  /* ---- bottom strip ---- */
+  .footer{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .footnav{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;}
+  .footnav .fbrand{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:-.3px;text-transform:none;}
+  .footnav a{color:var(--gray);text-decoration:none;}
+  .footnav a:hover{color:var(--ink);}
+  .followx{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--paper);background:var(--ink);border:1px solid var(--ink);border-radius:30px;padding:7px 14px;text-decoration:none;}
+  .followx:hover{background:var(--yellow);color:var(--ink);}
+  .reset{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);
+    background:none;border:1px solid var(--line2);border-radius:30px;padding:5px 11px;cursor:pointer;}
+  .reset:hover{background:var(--fill);}
+
+  /* ---- mobile ---- */
+  .mobtoggle{display:none;}
+  @media(max-width:840px){
+    .frame{padding:12px;gap:10px;}
+    .body{flex-direction:column;}
+    .schedcol{flex:0 0 auto;max-height:42%;}
+    .topright{display:none;}
+    .footnav .flink{display:none;}
+  }
+  @media(max-width:520px){
+    .title{font-size:21px;}
+    .dates{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="ident">
+        <div class="mark">FORMA BRISTOL</div>
+        <h1 class="title">The Forma Map of Bristol</h1>
+        <div class="subtitle">A Forma Guide &middot; Jun 27 — Jul 5, 2026</div>
+      </div>
+      <div class="topright">
+        <div class="meta"><b>18</b> nodes &middot; <b>9</b> days<br>Floating Harbour &amp; beyond<br>Bristol, UK</div>
+      </div>
+    </header>
+
+    <!-- DATE PILLS -->
+    <nav class="dates" id="dates"></nav>
+
+    <!-- MAP + SCHEDULE -->
+    <div class="body">
+      <div class="mapcol">
+        <div class="mapbox">
+          <div class="maplabel">Index / Map</div>
+          <div id="map"></div>
+          <div class="mapcredit">Leaflet &middot; CARTO &middot; OSM</div>
+        </div>
+      </div>
+
+      <aside class="schedcol">
+        <div class="schedhead">
+          <h2>Schedule</h2>
+          <span class="count" id="count">18 events</span>
+        </div>
+        <div class="schedlist" id="schedlist"></div>
+      </aside>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="footnav">
+        <span class="fbrand">Forma</span>
+        <a class="flink" href="#" onclick="return false">Home</a>
+        <a class="flink" href="#" onclick="return false">About</a>
+        <a class="flink" href="#" onclick="return false">Residency</a>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="reset" id="reset">All dates</button>
+        <a class="followx" href="https://x.com/forma" target="_blank" rel="noopener">Follow on X</a>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="data.js"></script>
+  <script>
+  /* ---------- map ---------- */
+  const map = L.map('map', { zoomControl:false, attributionControl:false, scrollWheelZoom:true });
+  L.control.zoom({ position:'topright' }).addTo(map);
+
+  // Are.na-minimal light basemap: CARTO Positron (no labels) tuned to near-paper
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    subdomains:'abcd', maxZoom:20
+  }).addTo(map);
+  // thin label layer on top
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+    subdomains:'abcd', maxZoom:20, opacity:.85
+  }).addTo(map);
+
+  const markers = {};
+  let selectedKey = null;
+
+  function popupHTML(v){
+    const lineup = (v.lineup && v.lineup.length)
+      ? '<ul class="plineup">' + v.lineup.map(l=>'<li>'+l+'</li>').join('') + '</ul>' : '';
+    const maps = v.maps ? '<a class="pmaps" href="'+v.maps+'" target="_blank" rel="noopener">Open in Maps &rarr;</a>' : '';
+    return '<div class="pop">'
+      + '<div class="ph"><span class="pday">'+v.date+'</span><span class="ptime">'+v.time+'</span></div>'
+      + '<div class="pbody">'
+      + '<span class="pvenue">'+ (v.hq ? 'PopUp HQ' : v.name) +'</span>'
+      + '<h3 class="ptitle">'+v.title+'</h3>'
+      + '<p class="pdesc">'+v.desc+'</p>'
+      + lineup + maps
+      + '</div></div>';
+  }
+
+  VENUES.forEach(v=>{
+    let icon;
+    if(v.hq){
+      icon = L.divIcon({ className:'', html:
+        '<div class="hqwrap"><div class="hqpulse"></div><div class="hqdot">HQ</div><span class="hqlabel">PopUp HQ</span></div>',
+        iconSize:[30,30], iconAnchor:[15,15] });
+    } else {
+      icon = L.divIcon({ className:'', html:'<div class="pin" data-k="'+v.key+'">'+v.n+'</div>',
+        iconSize:[24,24], iconAnchor:[12,12] });
+    }
+    const m = L.marker([v.lat, v.lng], { icon, zIndexOffset: v.hq?1000:0 }).addTo(map);
+    m.bindPopup(popupHTML(v), { closeButton:true, autoPan:true, autoPanPadding:[28,28] });
+    m.on('click', ()=> selectVenue(v.key, false));
+    markers[v.key] = m;
+  });
+
+  function fitAll(){
+    map.invalidateSize();
+    const b = L.latLngBounds(VENUES.map(v=>[v.lat,v.lng]));
+    map.fitBounds(b, { padding:[55,55] });
+  }
+
+  /* ---------- date pills ---------- */
+  const DATES = [...new Set(VENUES.map(v=>v.date))]; // keep program order
+  // build a clean chronological list of unique single dates for pills
+  const PILL_DATES = ["Jun 27","Jun 28","Jun 29","Jun 30","Jul 1","Jul 2","Jul 3","Jul 4","Jul 5"];
+  let activeDate = null;
+
+  const datesEl = document.getElementById('dates');
+  PILL_DATES.forEach(d=>{
+    const b = document.createElement('button');
+    b.className='datepill'; b.textContent=d.toUpperCase().replace(' ',' ');
+    b.onclick=()=>{ activeDate = (activeDate===d? null : d); renderPills(); renderList(); };
+    b.dataset.d=d;
+    datesEl.appendChild(b);
+  });
+  function renderPills(){
+    [...datesEl.children].forEach(b=> b.classList.toggle('active', b.dataset.d===activeDate));
+  }
+
+  /* ---------- schedule list ---------- */
+  const listEl = document.getElementById('schedlist');
+  const countEl = document.getElementById('count');
+
+  function venueMatchesDate(v,d){
+    if(!d) return true;
+    if(v.date===d) return true;
+    // HQ spans a range "Jun 29 – Jul 3"
+    if(v.hq){
+      const span=["Jun 29","Jun 30","Jul 1","Jul 2","Jul 3"];
+      return span.includes(d);
+    }
+    return false;
+  }
+
+  function renderList(){
+    const rows = VENUES.filter(v=>venueMatchesDate(v,activeDate));
+    countEl.textContent = rows.length + (rows.length===1?' event':' events');
+    listEl.innerHTML = rows.map(v=>{
+      const hqcls = v.hq ? ' hqcard' : '';
+      const selcls = v.key===selectedKey ? ' sel' : '';
+      const tag = v.hq ? '<span class="hqtag">Central HQ</span>' : '';
+      const numTxt = v.hq ? 'HQ' : ('No. '+v.n);
+      return '<div class="card'+hqcls+selcls+'" data-k="'+v.key+'">'
+        + '<div class="crow"><span class="cdate">'+v.date+'</span><span class="ctime">'+v.time+'</span></div>'
+        + '<h3 class="ctitle">'+v.title+tag+'</h3>'
+        + '<span class="cvenue">'+ (v.hq? 'PopUp HQ — Watershed' : v.name) +'</span>'
+        + '<div class="cnum" style="margin-top:5px;">'+numTxt+'</div>'
+        + '</div>';
+    }).join('');
+    [...listEl.querySelectorAll('.card')].forEach(c=>{
+      c.onclick=()=> selectVenue(c.dataset.k, true);
+    });
+  }
+
+  /* ---------- selection / fly ---------- */
+  function selectVenue(key, fly){
+    selectedKey = key;
+    const v = VENUES.find(x=>x.key===key);
+    if(!v) return;
+    // marker highlight
+    document.querySelectorAll('.pin').forEach(p=>p.classList.toggle('sel', p.dataset.k===key));
+    if(fly){
+      map.flyTo([v.lat, v.lng], 15, { duration:.8 });
+      setTimeout(()=> markers[key] && markers[key].openPopup(), 850);
+    }
+    renderList();
+    // scroll card into view
+    const card = listEl.querySelector('.card[data-k="'+key+'"]');
+    if(card) card.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  }
+
+  document.getElementById('reset').onclick=()=>{
+    activeDate=null; selectedKey=null; renderPills(); renderList(); fitAll();
+  };
+
+  /* ---------- init ---------- */
+  renderPills();
+  renderList();
+  map.whenReady(()=> setTimeout(fitAll, 300));
+  window.addEventListener('load', ()=> setTimeout(fitAll, 900));
+  window.addEventListener('resize', ()=> setTimeout(fitAll, 200));
+  </script>
+<script data-pplx-inline-edit>
+(function () {
+  if (window === window.top) return;
+
+  const allowedParentOrigins = ["https://www.perplexity.ai","https://perplexity.ai","https://testing.perplexity.ai","https://staging.perplexity.ai","https://*.preview.i.perplexity.ai","http://localhost:3000","http://127.0.0.1:3000","http://localhost:5173","http://127.0.0.1:5173"];
+  const MAX_FONT_BYTES = 500 * 1024;
+  const MAX_TOTAL_FONT_BYTES = 2 * 1024 * 1024;
+  let scrollForwarding = false;
+  let scrollRaf = 0;
+  let trustedTopOrigin = null;
+
+  // Allow entries like "https://*.preview.i.perplexity.ai" — the wildcard
+  // matches a single DNS label (no dots), so "https://*.foo" cannot stretch
+  // across multiple labels.
+  function matchesAllowedOrigin(origin) {
+    if (!origin) return false;
+    for (const entry of allowedParentOrigins) {
+      if (!entry.includes("*")) {
+        if (entry === origin) return true;
+        continue;
+      }
+      const pattern = new RegExp(
+        "^" +
+          entry.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^.]+") +
+          "$",
+      );
+      if (pattern.test(origin)) return true;
+    }
+    return false;
+  }
+
+  // Trust decision: when the sender is same-origin-visible (event.origin is a
+  // real origin like https://www.perplexity.ai) we trust event.origin directly.
+  // When event.origin is "null" (opaque broker srcdoc), we fall back to the
+  // broker's stamped `parentOrigin` to identify the top window. The fallback
+  // is claim-only — we rely on the browser's native `targetOrigin` enforcement
+  // on the response path (see postToTrustedTop) to ensure replies can't be
+  // delivered to anyone but the actual top window of that claimed origin.
+  function getTrustedParentOrigin(event) {
+    const forwardedParentOrigin =
+      typeof event.data.parentOrigin === "string" ? event.data.parentOrigin : null;
+    const parentOrigin = event.origin === "null" ? forwardedParentOrigin : event.origin;
+    return matchesAllowedOrigin(parentOrigin) ? parentOrigin : null;
+  }
+
+  // All responses go to window.top with targetOrigin = the allowlisted origin.
+  // An attacker that iframes us inside their own null-origin broker can claim
+  // any parentOrigin they like, but the browser will drop the reply whenever
+  // the real top's origin doesn't match — so the screenshot never leaves.
+  function postToTrustedTop(message) {
+    if (!trustedTopOrigin) return;
+    try {
+      window.top.postMessage(message, trustedTopOrigin);
+    } catch (_error) {}
+  }
+
+  function inlineAll(original, clone) {
+    if (original.nodeType !== 1 || clone.nodeType !== 1) return;
+
+    try {
+      const computedStyle = getComputedStyle(original);
+      // cssText on a computed style is the serialized declaration in modern
+      // Chromium/Safari — a single read beats enumerating ~400 longhand
+      // properties. Firefox returns "" here, so we fall back on empty.
+      const serialized = computedStyle.cssText;
+      if (serialized) {
+        clone.style.cssText = serialized;
+      } else {
+        const parts = new Array(computedStyle.length);
+        for (let index = 0; index < computedStyle.length; index += 1) {
+          const property = computedStyle[index];
+          parts[index] = `${property}:${computedStyle.getPropertyValue(property)};`;
+        }
+        clone.style.cssText = parts.join("");
+      }
+    } catch (_error) {}
+
+    const originalChildren = original.children;
+    const clonedChildren = clone.children;
+    for (
+      let index = 0;
+      index < originalChildren.length && index < clonedChildren.length;
+      index += 1
+    ) {
+      inlineAll(originalChildren[index], clonedChildren[index]);
+    }
+  }
+
+  function extractFontUrl(srcValue) {
+    const matches = [
+      ...srcValue.matchAll(
+        /url\(["']?([^"')]+)["']?\)(?:\s*format\(["']?([^"')]+)["']?\))?/gi,
+      ),
+    ];
+    if (matches.length === 0) return null;
+    const woff2 = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff2"));
+    if (woff2) return woff2[1];
+    const woff = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff"));
+    if (woff) return woff[1];
+    return matches[0][1];
+  }
+
+  // Cache resolved font URL -> data URI across captures. Fonts on a page
+  // essentially never change, and a batch run emits multiple captures back to
+  // back — without this we'd refetch + re-base64 every time.
+  const fontDataUriCache = new Map();
+  const SRC_DECLARATION_RE = /src\s*:\s*[^;}]+/i;
+
+  async function fetchAsDataUri(url) {
+    if (fontDataUriCache.has(url)) return fontDataUriCache.get(url);
+    let dataUri = null;
+    try {
+      const response = await fetch(url, { mode: "cors", credentials: "omit" });
+      if (response.ok) {
+        const blob = await response.blob();
+        if (blob.size <= MAX_FONT_BYTES) {
+          dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () =>
+              resolve(typeof reader.result === "string" ? reader.result : null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        }
+      }
+    } catch (_error) {
+      dataUri = null;
+    }
+    fontDataUriCache.set(url, dataUri);
+    return dataUri;
+  }
+
+  function collectFontFaceRuleTexts() {
+    const rules = [];
+    for (const sheet of document.styleSheets) {
+      let cssRules;
+      try {
+        cssRules = sheet.cssRules;
+      } catch (_error) {
+        continue;
+      }
+      if (!cssRules) continue;
+      for (const rule of cssRules) {
+        const cssText = rule.cssText || "";
+        if (cssText.startsWith("@font-face")) rules.push(cssText);
+      }
+    }
+    return rules;
+  }
+
+  async function buildInlinedFontCss() {
+    const ruleTexts = collectFontFaceRuleTexts();
+    if (ruleTexts.length === 0) return null;
+
+    const resolved = ruleTexts.map((cssText) => {
+      if (!SRC_DECLARATION_RE.test(cssText)) return null;
+      const srcMatch = cssText.match(/src\s*:\s*([^;}]+)[;}]/i);
+      if (!srcMatch) return null;
+      const url = extractFontUrl(srcMatch[1]);
+      if (!url) return null;
+      try {
+        return { cssText, url: new URL(url, document.baseURI).href };
+      } catch (_error) {
+        return null;
+      }
+    });
+
+    const dataUris = await Promise.all(
+      resolved.map((entry) => (entry ? fetchAsDataUri(entry.url) : Promise.resolve(null))),
+    );
+
+    const inlined = [];
+    let totalBytes = 0;
+    for (let index = 0; index < resolved.length; index += 1) {
+      const entry = resolved[index];
+      const dataUri = dataUris[index];
+      if (!entry || !dataUri) continue;
+      const approxBytes = dataUri.length * 0.75;
+      if (totalBytes + approxBytes > MAX_TOTAL_FONT_BYTES) break;
+      totalBytes += approxBytes;
+      inlined.push(entry.cssText.replace(SRC_DECLARATION_RE, `src: url("${dataUri}")`));
+    }
+    return inlined.length > 0 ? inlined.join("\n") : null;
+  }
+
+  function stripExternal(clone) {
+    const images = clone.querySelectorAll("img");
+    for (let index = 0; index < images.length; index += 1) {
+      const src = images[index].getAttribute("src");
+      if (src && !src.startsWith("data:")) images[index].removeAttribute("src");
+    }
+
+    const elements = clone.querySelectorAll("*");
+    for (let index = 0; index < elements.length; index += 1) {
+      const style = elements[index].style.cssText;
+      if (style && style.includes("url(")) {
+        elements[index].style.cssText = style.replace(
+          /url\(["']?(?!data:)[^)"']*["']?\)/gi,
+          "none",
+        );
+      }
+    }
+  }
+
+  function emitScroll() {
+    scrollRaf = 0;
+    if (!scrollForwarding) return;
+    postToTrustedTop({
+      type: "INLINE_EDIT_SCROLL",
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+    });
+  }
+
+  window.addEventListener(
+    "scroll",
+    function () {
+      if (!scrollForwarding || scrollRaf) return;
+      scrollRaf = requestAnimationFrame(emitScroll);
+    },
+    { passive: true, capture: true },
+  );
+
+  async function handleCaptureRequest(event) {
+    const requestId = event.data.requestId;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    function postResult(dataUrl) {
+      postToTrustedTop({
+        type: "INLINE_EDIT_SCREENSHOT_RESULT",
+        requestId,
+        dataUrl,
+        scrollX,
+        scrollY,
+      });
+    }
+
+    try {
+      // Wait for any pending web fonts to resolve so both inline metrics and
+      // the @font-face inlining below see the same loaded faces.
+      if (document.fonts && document.fonts.ready) {
+        try {
+          await document.fonts.ready;
+        } catch (_error) {}
+      }
+
+      const clone = document.documentElement.cloneNode(true);
+      inlineAll(document.documentElement, clone);
+
+      const removedNodes = clone.querySelectorAll("script,link[rel=\"stylesheet\"],style");
+      for (let index = 0; index < removedNodes.length; index += 1) {
+        removedNodes[index].remove();
+      }
+
+      stripExternal(clone);
+
+      // Re-embed web fonts as data-URI @font-face rules so the SVG rasterizer
+      // can resolve them — external font URLs aren't fetched during
+      // foreignObject rendering, which would otherwise force a fallback face
+      // and change text metrics.
+      const inlinedFontCss = await buildInlinedFontCss();
+      if (inlinedFontCss) {
+        const styleEl = document.createElement("style");
+        styleEl.textContent = inlinedFontCss;
+        const head = clone.querySelector("head");
+        if (head) head.appendChild(styleEl);
+        else clone.insertBefore(styleEl, clone.firstChild);
+      }
+
+      const html = new XMLSerializer().serializeToString(clone);
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+        '<foreignObject width="100%" height="100%">' +
+        `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden">` +
+        `<div style="position:relative;left:-${scrollX}px;top:-${scrollY}px">` +
+        html +
+        "</div></div></foreignObject></svg>";
+      const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      const image = new Image();
+      image.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(image, 0, 0);
+        postResult(canvas.toDataURL("image/png"));
+      };
+      image.onerror = function () {
+        postResult(null);
+      };
+      image.src = svgUrl;
+    } catch (_error) {
+      postResult(null);
+    }
+  }
+
+  window.addEventListener("message", function (event) {
+    if (!event.data) return;
+    // Only accept messages from the direct parent frame. Blocks sibling /
+    // unrelated-window postMessage senders that could otherwise reach us.
+    if (event.source !== window.parent) return;
+
+    const trustedParentOrigin = getTrustedParentOrigin(event);
+    if (!trustedParentOrigin) return;
+    trustedTopOrigin = trustedParentOrigin;
+
+    if (event.data.type === "INLINE_EDIT_SCROLL_START") {
+      scrollForwarding = true;
+      emitScroll();
+      return;
+    }
+
+    if (event.data.type === "INLINE_EDIT_SCROLL_STOP") {
+      scrollForwarding = false;
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      scrollRaf = 0;
+      return;
+    }
+
+    if (event.data.type !== "INLINE_EDIT_CAPTURE_REQUEST") return;
+
+    handleCaptureRequest(event);
+  });
+})();
+
+
+</script></body>
+</html>
