@@ -536,6 +536,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
 /* ============================================================
    SCHEDULE — embedded events map
    ============================================================ */
+#schedule{ background:#EAEFD6; }   /* soft signal-tinted paper, set apart from neighbours */
 .schedule-embed{ width:100%; height:clamp(560px,80vh,800px);
   border:1px solid var(--line-dark); border-radius:var(--r); overflow:hidden;
   background:#fff; box-shadow:0 16px 38px rgba(0,0,0,.08); }
