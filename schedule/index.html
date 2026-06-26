@@ -216,20 +216,6 @@
       </aside>
     </div>
 
-    <!-- FOOTER -->
-    <footer class="footer">
-      <div class="footnav">
-        <span class="fbrand">Forma</span>
-        <a class="flink" href="#" onclick="return false">Home</a>
-        <a class="flink" href="#" onclick="return false">About</a>
-        <a class="flink" href="#" onclick="return false">Residency</a>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button class="reset" id="reset">All dates</button>
-        <a class="followx" href="https://x.com/forma" target="_blank" rel="noopener">Follow on X</a>
-      </div>
-    </footer>
-
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -357,7 +343,8 @@
     if(card) card.scrollIntoView({ block:'nearest', behavior:'smooth' });
   }
 
-  document.getElementById('reset').onclick=()=>{
+  const _resetBtn=document.getElementById('reset');
+  if(_resetBtn) _resetBtn.onclick=()=>{
     activeDate=null; selectedKey=null; renderPills(); renderList(); fitAll();
   };
 
